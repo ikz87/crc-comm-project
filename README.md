@@ -1,2 +1,3 @@
 # crc_comm_project
-Final project for my "Communication Systems 2" course
+Simulates and analyzes a digital communication with CRC
+Meant to be used on matlab
