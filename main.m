@@ -6,7 +6,7 @@ function []=crc_comm(infile_path, outfile_path)
         end
 
         % Divisor we'll use to get our remainders
-        divisor = [1 1 1 1];
+        divisor = [1 1 0 1];
         divisor_bsize = numel(divisor);
 
         % Get binary data from file
@@ -74,47 +74,59 @@ function []=crc_comm(infile_path, outfile_path)
         % with a (simulated) random chance for 
         % every bit to be flipped
         
-        transmitted_mess = uint8(zeros(total_packets, packet_bsize));
-        flip_for_one_in = 10;
+        received_mess = uint8(zeros(total_packets, packet_bsize));
+        flip_for_one_in = 100;
         packets_sent = 0;
         while true
             if packets_sent == total_packets - 1
                 % Handle last packet differently
                 curr_packet = coded_mess(packets_sent+1, :);
+
+                % Potentially flip bits
+                for i = 1:packet_bsize
+                    if (randi([1 flip_for_one_in]) == 1)
+                        curr_packet(i) = uint8(~curr_packet(i));
+                    end
+                end
+
                 data = curr_packet(1:last_packet_bsize-divisor_bsize);
                 brem = curr_packet(last_packet_bsize-divisor_bsize+1:last_packet_bsize);
 
                 if (brem == binary_rem(data, divisor))
-                    fprintf("Got packet %d with no errors.\n", packets_sent+1);
+                    fprintf("CRC matches for packet %d.\n", packets_sent+1);
+                    received_mess(packets_sent+1, :) = curr_packet;
                     break
                 else
                     fprintf("Error detected in packet %d. Retrying transmission...\n", packets_sent+1);
                 end
-            end
-
-            % Get current packet
-            curr_packet = coded_mess(packets_sent+1, :);
-
-            % Potentially flip a bit
-            for i = 1:packet_bsize
-                if (randi([1 flip_for_one_in]) == 1)
-                    curr_packet(i) = uint8(~curr_packet(i));
-                end
-            end
-
-            % Check packet integrity with CRC
-            data = curr_packet(1:packet_bsize-divisor_bsize);
-            brem = curr_packet(end-divisor_bsize+1:end);
-
-            if (brem == binary_rem(data, divisor))
-                fprintf("Got packet %d with no errors.\n", packets_sent+1);
-                packets_sent = packets_sent+1;
             else
-                fprintf("Error detected in packet %d. Retrying transmission...\n", packets_sent+1);
+                % Get current packet
+                curr_packet = coded_mess(packets_sent+1, :);
+
+                % Potentially flip bits
+                for i = 1:packet_bsize
+                    if (randi([1 flip_for_one_in]) == 1)
+                        curr_packet(i) = uint8(~curr_packet(i));
+                    end
+                end
+
+                % Check packet integrity with CRC
+                data = curr_packet(1:packet_bsize-divisor_bsize);
+                brem = curr_packet(end-divisor_bsize+1:end);
+
+                if (brem == binary_rem(data, divisor))
+                    fprintf("CRC matches packet %d.\n", packets_sent+1);
+                    received_mess(packets_sent+1, :) = curr_packet;
+                    packets_sent = packets_sent+1;
+                else
+                    fprintf("Error detected in packet %d. Retrying transmission...\n", packets_sent+1);
+                end
             end
         end
 
+        display(isequal(received_mess, coded_mess));
         %TODO: Add decoding logic and write output file
+        
 
     catch err
         if strcmp(err.identifier, "MATLAB:FileIO:InvalidFid")
