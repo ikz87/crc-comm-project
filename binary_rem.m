@@ -7,6 +7,6 @@ function [brem] = binary_rem(dividend, divisor)
     decimal_remainder = mod(decimal_dividend, decimal_divisor);
 
     % Convert the remainder back to binary representation
-    brem = de2bi(decimal_remainder, numel(divisor) - 1, 'left-msb');
+    brem = de2bi(decimal_remainder, numel(divisor), 'left-msb');
 end
 

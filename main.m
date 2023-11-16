@@ -33,7 +33,8 @@ function []=crc_comm(infile_path, outfile_path)
 
             % Add the trailing remainder bits
             brem = binary_rem(inpacket, divisor);
-            outpacket = [ inpacket brem ]
+            outpacket = [ inpacket brem ];
+            display(outpacket);
 
             if numel(bits) < n 
                 % TODO: Handle last packet if it has
