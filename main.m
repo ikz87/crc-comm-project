@@ -115,7 +115,7 @@ function []=crc_comm(infile_path, outfile_path)
                 brem = curr_packet(end-divisor_bsize+1:end);
 
                 if (brem == binary_rem(data, divisor))
-                    fprintf("CRC matches packet %d.\n", packets_sent+1);
+                    fprintf("CRC matches for packet %d.\n", packets_sent+1);
                     received_mess(packets_sent+1, :) = curr_packet;
                     packets_sent = packets_sent+1;
                 else
