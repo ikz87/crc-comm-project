@@ -21,56 +21,100 @@ function []=crc_comm(infile_path, outfile_path)
         % We'll add a CRC after every packet
         % of n bits
         n = uint8(8);
-        outpacket_bsize = n + divisor_bsize;
+        packet_bsize = n + divisor_bsize;
 
         % Initialize an array with the size of
         % our (to be) coded message
         total_packets = idivide(file_bsize, n);
-        coded_size = total_packets * outpacket_bsize;
+        coded_size = total_packets * packet_bsize;
         coded_rem = mod(file_bsize, n);
-        last_outpacket_bsize = outpacket_bsize;
+        last_packet_bsize = packet_bsize;
         if (coded_rem > 0)
             total_packets = total_packets + 1;
-            last_outpacket_bsize = coded_rem + divisor_bsize;
-            coded_size = coded_size + last_outpacket_bsize;
+            last_packet_bsize = coded_rem + divisor_bsize;
+            coded_size = coded_size + last_packet_bsize;
         end
-        outmess = uint8(zeros(total_packets, outpacket_bsize));
+        coded_mess = uint8(zeros(total_packets, packet_bsize));
 
         % Add CRC to our n bit packets
-        packets_sent = 0;
+        packets_coded = 0;
         while true
-            if packets_sent == total_packets - 1
+            if packets_coded == total_packets - 1
                 % Handle last packet differently
-                inpacket = transpose(bits);
+                data = transpose(bits);
 
                 % Add the trailing remainder bits
-                brem = binary_rem(inpacket, divisor);
-                outpacket = [ inpacket brem ];
+                brem = binary_rem(data, divisor);
+                curr_packet = [ data brem ];
 
-                % Add the outpacket to outmess
-                outmess(packets_sent+1, 1:last_outpacket_bsize) = outpacket;
+                % Add the curr_packet to coded_mess
+                coded_mess(packets_coded+1, 1:last_packet_bsize) = curr_packet;
                 break
             end
 
             % Get current packet
-            inpacket = transpose(bits(1:n));
+            data = transpose(bits(1:n));
             bits = bits(n+1:end);
 
             % Add the trailing remainder bits
-            brem = binary_rem(inpacket, divisor);
-            outpacket = [ inpacket brem ];
+            brem = binary_rem(data, divisor);
+            curr_packet = [ data brem ];
             
-            % Add the outpacket to outmess
-            outmess(packets_sent+1, :) = outpacket;
+            % Add the curr_packet to coded_mess
+            coded_mess(packets_coded+1, :) = curr_packet;
 
-            packets_sent = packets_sent + 1;
+            packets_coded = packets_coded + 1;
 
         end
 
-        display(outmess);
-        % TODO: Introduce some noise in the form
-        % of a chance of a bit being flipped in every package 
+        % At this point, we have a matrix coded_mess
+        % with its rows being the coded packets
+        % of our original file.
+        % We'll transmit this matrix packet by packet
+        % with a (simulated) random chance for 
+        % every bit to be flipped
+        
+        transmitted_mess = uint8(zeros(total_packets, packet_bsize));
+        flip_for_one_in = 10;
+        packets_sent = 0;
+        while true
+            if packets_sent == total_packets - 1
+                % Handle last packet differently
+                curr_packet = coded_mess(packets_sent+1, :);
+                data = curr_packet(1:last_packet_bsize-divisor_bsize);
+                brem = curr_packet(last_packet_bsize-divisor_bsize+1:last_packet_bsize);
 
+                if (brem == binary_rem(data, divisor))
+                    fprintf("Got packet %d with no errors.\n", packets_sent+1);
+                    break
+                else
+                    fprintf("Error detected in packet %d. Retrying transmission...\n", packets_sent+1);
+                end
+            end
+
+            % Get current packet
+            curr_packet = coded_mess(packets_sent+1, :);
+
+            % Potentially flip a bit
+            for i = 1:packet_bsize
+                if (randi([1 flip_for_one_in]) == 1)
+                    curr_packet(i) = uint8(~curr_packet(i));
+                end
+            end
+
+            % Check packet integrity with CRC
+            data = curr_packet(1:packet_bsize-divisor_bsize);
+            brem = curr_packet(end-divisor_bsize+1:end);
+
+            if (brem == binary_rem(data, divisor))
+                fprintf("Got packet %d with no errors.\n", packets_sent+1);
+                packets_sent = packets_sent+1;
+            else
+                fprintf("Error detected in packet %d. Retrying transmission...\n", packets_sent+1);
+            end
+        end
+
+        %TODO: Add decoding logic and write output file
 
     catch err
         if strcmp(err.identifier, "MATLAB:FileIO:InvalidFid")
