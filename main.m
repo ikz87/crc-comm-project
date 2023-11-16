@@ -28,18 +28,30 @@ function []=crc_comm(infile_path, outfile_path)
         total_packets = idivide(file_bsize, n);
         coded_size = total_packets * outpacket_bsize;
         coded_rem = mod(file_bsize, n);
-        last_outpacket_bsize = 0;
+        last_outpacket_bsize = outpacket_bsize;
         if (coded_rem > 0)
             total_packets = total_packets + 1;
             last_outpacket_bsize = coded_rem + divisor_bsize;
             coded_size = coded_size + last_outpacket_bsize;
         end
         outmess = uint8(zeros(total_packets, outpacket_bsize));
-        display(outmess)
 
         % Add CRC to our n bit packets
-        counter = 0;
+        packets_sent = 0;
         while true
+            if packets_sent == total_packets - 1
+                % Handle last packet differently
+                inpacket = transpose(bits);
+
+                % Add the trailing remainder bits
+                brem = binary_rem(inpacket, divisor);
+                outpacket = [ inpacket brem ];
+
+                % Add the outpacket to outmess
+                outmess(packets_sent+1, 1:last_outpacket_bsize) = outpacket;
+                break
+            end
+
             % Get current packet
             inpacket = transpose(bits(1:n));
             bits = bits(n+1:end);
@@ -49,36 +61,16 @@ function []=crc_comm(infile_path, outfile_path)
             outpacket = [ inpacket brem ];
             
             % Add the outpacket to outmess
-            display(inpacket)
-            display(outpacket)
-            outmess(counter+1, :) = outpacket;
-            display(outmess)
+            outmess(packets_sent+1, :) = outpacket;
 
-            counter = counter + 1;
+            packets_sent = packets_sent + 1;
 
-            if numel(bits) < n 
-                if numel(bits) > 0
-                    % Handle last packet if it has
-                    % less than n bits
-                    inpacket = transpose(bits);
-
-                    % Add the trailing remainder bits
-                    brem = binary_rem(inpacket, divisor);
-                    outpacket = [ inpacket brem ];
-
-                    % Add the outpacket to outmess
-                    display(inpacket)
-                    display(outpacket)
-                    outmess(counter+1, 1:last_outpacket_bsize) = outpacket;
-                    display(outmess)
-                end
-                break
-            end
         end
 
         display(outmess);
         % TODO: Introduce some noise in the form
         % of a chance of a bit being flipped in every package 
+
 
     catch err
         if strcmp(err.identifier, "MATLAB:FileIO:InvalidFid")
