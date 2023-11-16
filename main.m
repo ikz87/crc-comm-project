@@ -1,4 +1,4 @@
-function []=main(infile_path, outfile_path)
+function []=crc_comm(infile_path, outfile_path)
     try
         % Divisor we'll use to get our remainders
         divisor = [1 1 1 1];
@@ -14,20 +14,26 @@ function []=main(infile_path, outfile_path)
 
         % We'll add a CRC after every packet
         % of n bits
-        n = uint8(7);
+        n = uint8(8);
 
         % Initialize an array with the size of
         % our (to be) coded message
         coded_size = idivide(file_bsize, n) * divisor_bsize + file_bsize;
-        coded_rem = mod(file_bsize, n)
+        coded_rem = mod(file_bsize, n);
         if (coded_rem > 0)
             coded_size = coded_size + coded_rem + divisor_bsize;
         end
-
         out_mess = uint8.empty(0, coded_size);
+
+        % Add CRC to our n bit packets
         while true
-            packet = bits(1:n);
+            % Get current packet
+            inpacket = double(transpose(bits(1:n)));
             bits = bits(n+1:end);
+
+            % Add the trailing remainder bits
+            brem = binary_rem(inpacket, divisor);
+            outpacket = [ inpacket brem ]
 
             if numel(bits) < n 
                 % TODO: Handle last packet if it has
@@ -42,4 +48,5 @@ function []=main(infile_path, outfile_path)
 %        else
             rethrow(err);
 %        end
+    end
 end
