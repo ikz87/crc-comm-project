@@ -15,19 +15,19 @@ function []=crc_comm(infile_path, outfile_path)
         fclose(infile);
         bits = uint8(rem(floor((1 ./ [128, 64, 32, 16, 8, 4, 2, 1].') * data), 2));
         bits = bits(:);
-        inmess = bits;
-        file_bsize = numel(bits);
+        message = transpose(bits);
+        message_bsize = numel(bits);
 
         % We'll add a CRC after every packet
         % of n bits
-        n = uint8(8);
+        n = uint8(7);
         packet_bsize = n + divisor_bsize;
 
         % Initialize an array with the size of
         % our (to be) coded message
-        total_packets = idivide(file_bsize, n);
+        total_packets = idivide(message_bsize, n);
         coded_size = total_packets * packet_bsize;
-        coded_rem = mod(file_bsize, n);
+        coded_rem = mod(message_bsize, n);
         last_packet_bsize = packet_bsize;
         if (coded_rem > 0)
             total_packets = total_packets + 1;
@@ -74,8 +74,8 @@ function []=crc_comm(infile_path, outfile_path)
         % with a (simulated) random chance for 
         % every bit to be flipped
         
-        received_mess = uint8(zeros(total_packets, packet_bsize));
-        flip_for_one_in = 100;
+        received_mess = uint8(zeros(1,message_bsize));
+        flip_for_one_in = 16;
         packets_sent = 0;
         while true
             if packets_sent == total_packets - 1
@@ -92,9 +92,10 @@ function []=crc_comm(infile_path, outfile_path)
                 data = curr_packet(1:last_packet_bsize-divisor_bsize);
                 brem = curr_packet(last_packet_bsize-divisor_bsize+1:last_packet_bsize);
 
+                % Check packet integrity with CRC
                 if (brem == binary_rem(data, divisor))
                     fprintf("CRC matches for packet %d.\n", packets_sent+1);
-                    received_mess(packets_sent+1, :) = curr_packet;
+                    received_mess(end-coded_rem+1:end) = data;
                     break
                 else
                     fprintf("Error detected in packet %d. Retrying transmission...\n", packets_sent+1);
@@ -116,7 +117,7 @@ function []=crc_comm(infile_path, outfile_path)
 
                 if (brem == binary_rem(data, divisor))
                     fprintf("CRC matches for packet %d.\n", packets_sent+1);
-                    received_mess(packets_sent+1, :) = curr_packet;
+                    received_mess(n*packets_sent+1:n*(packets_sent+1)) = data;
                     packets_sent = packets_sent+1;
                 else
                     fprintf("Error detected in packet %d. Retrying transmission...\n", packets_sent+1);
@@ -124,9 +125,8 @@ function []=crc_comm(infile_path, outfile_path)
             end
         end
 
-        display(isequal(received_mess, coded_mess));
-        %TODO: Add decoding logic and write output file
-        
+        display(message);
+        display(received_mess);
 
     catch err
         if strcmp(err.identifier, "MATLAB:FileIO:InvalidFid")
