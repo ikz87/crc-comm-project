@@ -1,12 +1,24 @@
-function [brem] = binary_rem(dividend, divisor)
-    % Convert to decimal
-    decimal_dividend = bi2de(dividend, 'left-msb');
-    decimal_divisor = bi2de(divisor, 'left-msb');
+function [brem] = binary_rem(data,crc)
+    crcw = length(crc)-1;
+    initVal = zeros(1,crcw);
+    finalXOR = zeros(1,crcw);
+    am = [data,zeros(1,crcw)];
+    am(1:crcw) = xor(am(1:crcw),initVal);
 
-    % Get remainder
-    decimal_remainder = mod(decimal_dividend, decimal_divisor);
+    % CRC calculation
+    reg = [0,am(1:crcw)];
+    for i=crcw+1:length(am)
+        reg = [reg(2:end),am(i)];
+        if reg(1)==1
+            reg = xor(reg, crc);
+        end
+    end
+    mcrc = reg(2:end);
+    brem = xor(mcrc,finalXOR);
 
-    % Convert the remainder back to binary representation
-    brem = de2bi(decimal_remainder, numel(divisor), 'left-msb');
+    crc_bsize = numel(crc);
+    brem_bsize = numel(brem);
+    if (brem_bsize < crc_bsize)
+        brem = [ zeros(1,crc_bsize - brem_bsize) brem];
 end
 
