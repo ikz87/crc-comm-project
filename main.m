@@ -14,9 +14,10 @@ function []=crc_comm(infile_path, outfile_path)
             error('Could not open infile for reading');
         end
 
-        % Divisor we'll use to get our remainders
-        divisor = [1 0 0 0 1 1 1];
-        divisor_bsize = numel(divisor);
+        % Generator we'll use to get our crc
+        generator = [1 0 0 0 1 1 1];
+        generator_bsize = numel(generator);
+        crc_bsize = generator_bsize - 1;
 
         % Get binary data from file
         data = fread(infile, [1, Inf], 'uint8');
@@ -29,7 +30,7 @@ function []=crc_comm(infile_path, outfile_path)
         % We'll add a CRC after every packet
         % of n bits
         n = 256;
-        packet_bsize = n + divisor_bsize;
+        packet_bsize = n + crc_bsize;
 
         % Initialize an array with the size of
         % our (to be) coded message
@@ -39,7 +40,7 @@ function []=crc_comm(infile_path, outfile_path)
         last_packet_bsize = packet_bsize;
         if (coded_rem > 0)
             total_packets = total_packets + 1;
-            last_packet_bsize = coded_rem + divisor_bsize;
+            last_packet_bsize = coded_rem + crc_bsize;
             coded_size = coded_size + last_packet_bsize;
         end
         coded_signal = zeros(total_packets, packet_bsize);
@@ -52,9 +53,9 @@ function []=crc_comm(infile_path, outfile_path)
                 % Handle last packet differently
                 data = transpose(bits);
 
-                % Add the trailing remainder bits
-                brem = binary_rem(data, divisor);
-                curr_packet = [ data brem ];
+                % Add the trailing crc bits
+                crc = crc_gen([data zeros(1, crc_bsize)], generator);
+                curr_packet = [ data crc ];
 
                 % Add the curr_packet to coded_signal
                 coded_signal(packets_coded+1, 1:last_packet_bsize) = curr_packet;
@@ -66,8 +67,8 @@ function []=crc_comm(infile_path, outfile_path)
             bits = bits(n+1:end);
 
             % Add the trailing remainder bits
-            brem = binary_rem(data, divisor);
-            curr_packet = [ data brem ];
+            crc = crc_gen([data zeros(1, crc_bsize)], generator);
+            curr_packet = [ data crc ];
             
             % Add the curr_packet to coded_signal
             coded_signal(packets_coded+1, :) = curr_packet;
@@ -103,11 +104,11 @@ function []=crc_comm(infile_path, outfile_path)
                 received_packet = awgn(modulated_packet, SNR);
                 demodulated_packet = pskdemod(received_packet, M);
 
-                data = demodulated_packet(1:last_packet_bsize-divisor_bsize);
-                brem = demodulated_packet(last_packet_bsize-divisor_bsize+1:last_packet_bsize);
+                data = demodulated_packet(1:last_packet_bsize-crc_bsize);
+                crc = crc_gen(demodulated_packet, generator);
 
                 % Check packet integrity with CRC
-                if (brem == binary_rem(data, divisor))
+                if (crc == 0)
                     fprintf("\rCRC matches for packet %d of", packets_sent+1, total_packets);
                     received_mess(end-coded_rem+1:end) = data;
                     received_signal(packets_sent*packet_bsize+1:(packets_sent+1)*packet_bsize) = received_packet;
@@ -132,9 +133,9 @@ function []=crc_comm(infile_path, outfile_path)
 
                 % Check packet integrity with CRC
                 data = demodulated_packet(1:n);
-                brem = demodulated_packet(n+1:end);
+                crc = crc_gen(demodulated_packet, generator);
 
-                if (brem == binary_rem(data, divisor))
+                if (crc == 0)
                     fprintf("\rCRC matches for packet %d of %d", packets_sent+1, total_packets);
                     received_mess(n*packets_sent+1:n*(packets_sent+1)) = data;
                     received_signal(packets_sent*packet_bsize+1:(packets_sent+1)*packet_bsize) = received_packet;
@@ -175,7 +176,7 @@ function []=crc_comm(infile_path, outfile_path)
         fprintf("BER without CRC: %d errors in decoded message (%f per million bits)\n", number_no_crc, ratio_no_crc*1000000);
         fprintf("BER with CRC: %d errors in decoded message (%f per million bits)\n", number, ratio*1000000);
         fprintf("Our CRC implementation made the BER %f times better\n", number_no_crc/number);
-        fprintf("While only using %f more bandwith\n", (total_packets*packet_bsize)/message_bsize);
+        fprintf("While only using %f more bandwith\n", ((total_packets+failed_packet_transmissions)*packet_bsize)/message_bsize);
 
         % Eye pattern
         if numel(received_signal) > 3000
