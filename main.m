@@ -53,7 +53,7 @@ function []=crc_comm(infile_path, outfile_path)
                 % Handle last packet differently
                 data = transpose(bits);
 
-                % Add the trailing crc bits
+                % Add the trailing CRC bits
                 crc = crc_gen([data zeros(1, crc_bsize)], generator);
                 curr_packet = [ data crc ];
 
@@ -82,7 +82,7 @@ function []=crc_comm(infile_path, outfile_path)
         % with its rows being the coded packets
         % of our original file.
         % We'll transmit this matrix packet by packet
-        % with PSK mod
+        % with BPSK mod
         
         SNR = 6.5;
         M = 2;
@@ -99,7 +99,7 @@ function []=crc_comm(infile_path, outfile_path)
                 % Handle last packet differently
                 curr_packet = coded_signal(packets_sent+1, :);
 
-                % Transmit it with PSK mod
+                % Transmit it with BPSK mod
                 modulated_packet = pskmod(curr_packet, M);
                 received_packet = awgn(modulated_packet, SNR);
                 demodulated_packet = pskdemod(received_packet, M);
@@ -126,7 +126,7 @@ function []=crc_comm(infile_path, outfile_path)
                 % Get current packet
                 curr_packet = coded_signal(packets_sent+1, :);
 
-                % Transmit it with PSK mod
+                % Transmit it with BPSK mod
                 modulated_packet = pskmod(curr_packet, M);
                 received_packet = awgn(modulated_packet, SNR);
                 demodulated_packet = pskdemod(received_packet, M);
